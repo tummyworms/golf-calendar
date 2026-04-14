@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.env
+
+# Data (local only — don't commit scraped/entered events)
+data/events.json
+data/upcoming.json
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/

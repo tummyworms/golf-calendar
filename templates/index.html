@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Pittsburgh Golf Outings — 15239 Area</title>
+
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/main.min.js"></script>
+
+  <!-- Leaflet (OpenStreetMap — no API key needed) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    :root {
+      --green:  #2d6a4f;
+      --green2: #40916c;
+      --green3: #74c69d;
+      --cream:  #f5f7f0;
+      --gold:   #c8960c;
+      --dark:   #1b2a1e;
+      --text:   #2c3e2d;
+      --muted:  #6b7c6e;
+      --card:   #ffffff;
+      --border: #d0ddd2;
+      --red:    #c0392b;
+      --blue:   #1565c0;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:var(--cream);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+    /* ── Header ── */
+    header{
+      background:linear-gradient(135deg,var(--dark) 0%,var(--green) 100%);
+      color:#fff;padding:14px 24px;
+      display:flex;align-items:center;justify-content:space-between;
+      box-shadow:0 2px 8px rgba(0,0,0,.3);flex-shrink:0;
+    }
+    .header-left h1{font-size:1.4rem;font-weight:700;}
+    .header-left p{font-size:.78rem;opacity:.7;margin-top:2px;}
+    .header-actions{display:flex;gap:8px;align-items:center;}
+
+    /* ── Buttons ── */
+    .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border:none;border-radius:6px;
+         font-size:.82rem;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;text-decoration:none;}
+    .btn:hover{opacity:.85;transform:translateY(-1px);}
+    .btn-primary  {background:var(--gold);color:#fff;}
+    .btn-secondary{background:var(--green2);color:#fff;}
+    .btn-outline  {background:transparent;border:2px solid rgba(255,255,255,.6);color:#fff;}
+    .btn-blue     {background:var(--blue);color:#fff;}
+    .btn-danger   {background:var(--red);color:#fff;}
+    .btn-sm       {padding:5px 10px;font-size:.75rem;}
+    .btn-ghost    {background:transparent;border:1px solid var(--border);color:var(--text);}
+
+    /* ── Layout ── */
+    .layout{display:grid;grid-template-columns:300px 1fr;flex:1;overflow:hidden;}
+
+    /* ── Sidebar ── */
+    .sidebar{background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+    .sidebar-tabs{display:flex;border-bottom:2px solid var(--border);flex-shrink:0;}
+    .tab-btn{flex:1;padding:10px 0;background:none;border:none;font-size:.75rem;font-weight:700;
+             color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;
+             text-transform:uppercase;letter-spacing:.4px;transition:color .15s;}
+    .tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+    .tab-panel{display:none;flex-direction:column;flex:1;overflow:hidden;}
+    .tab-panel.active{display:flex;}
+
+    /* ── Shared list styles ── */
+    .list-search{padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+    .list-search input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:5px;font-size:.82rem;}
+    .scroll-list{overflow-y:auto;flex:1;padding:8px 10px;}
+
+    /* ── Event cards ── */
+    .event-card{
+      background:#fff;border:1px solid var(--border);border-left:4px solid var(--green2);
+      border-radius:7px;padding:11px;margin-bottom:9px;cursor:pointer;
+      transition:box-shadow .15s;
+    }
+    .event-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.1);}
+    .event-card.tournament{border-left-color:var(--gold);}
+    .event-card h4{font-size:.85rem;font-weight:700;color:var(--dark);margin-bottom:5px;line-height:1.3;}
+    .event-card .meta{font-size:.74rem;color:var(--muted);display:flex;flex-direction:column;gap:2px;}
+    .event-card .card-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;}
+
+    /* upcoming cards have blue accent */
+    .upcoming-card{border-left-color:var(--blue) !important;}
+
+    /* ── Badges ── */
+    .badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+    .badge-outing    {background:#e0f2ea;color:#1b5e3b;}
+    .badge-tournament{background:#fef3cd;color:#7d5a00;}
+    .badge-butlers   {background:#e8eaf6;color:#283593;}
+    .badge-3lakes    {background:#e0f7fa;color:#006064;}
+    .badge-eventbrite{background:#fce4ec;color:#880e4f;}
+    .badge-pgt       {background:#fff8e1;color:#e65100;}
+    .badge-manual    {background:#ede7f6;color:#4527a0;}
+
+    /* ── Courses ── */
+    .course-card{background:var(--cream);border:1px solid var(--border);border-radius:7px;padding:11px;margin-bottom:9px;}
+    .course-card h4{font-size:.85rem;font-weight:700;margin-bottom:4px;}
+    .course-card .meta{font-size:.74rem;color:var(--muted);}
+    .course-card .card-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;}
+
+    /* ── Add form ── */
+    .add-form{overflow-y:auto;flex:1;padding:12px;}
+    .form-group{margin-bottom:11px;}
+    .form-group label{display:block;font-size:.76rem;font-weight:600;color:var(--dark);margin-bottom:3px;}
+    .form-group input,.form-group select,.form-group textarea{
+      width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:5px;
+      font-size:.81rem;font-family:inherit;background:#fff;
+    }
+    .form-group input:focus,.form-group select:focus,.form-group textarea:focus{
+      outline:none;border-color:var(--green2);
+    }
+    .form-group textarea{resize:vertical;min-height:60px;}
+
+    /* ── Main area ── */
+    .main-area{display:flex;flex-direction:column;overflow:hidden;}
+    .view-bar{
+      padding:8px 14px;background:var(--card);border-bottom:1px solid var(--border);
+      display:flex;gap:7px;align-items:center;flex-shrink:0;flex-wrap:wrap;
+    }
+    .view-bar .spacer{flex:1;}
+    .view-bar .status{font-size:.75rem;color:var(--muted);}
+
+    /* view containers */
+    #calendar-view{flex:1;overflow:auto;padding:14px;}
+    #calendar{min-height:400px;}
+    #map-view{flex:1;display:none;}
+    #map{height:100%;width:100%;}
+
+    /* ── Modal ── */
+    .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+                    z-index:1000;align-items:center;justify-content:center;}
+    .modal-backdrop.open{display:flex;}
+    .modal{background:#fff;border-radius:12px;padding:26px;max-width:500px;width:92%;
+           box-shadow:0 10px 40px rgba(0,0,0,.25);position:relative;max-height:90vh;overflow-y:auto;}
+    .modal h2{font-size:1.1rem;margin-bottom:4px;color:var(--dark);}
+    .modal .m-course{color:var(--green);font-weight:600;font-size:.87rem;margin-bottom:8px;}
+    .modal .m-date{font-size:.85rem;color:var(--muted);margin-bottom:10px;}
+    .modal .m-desc{font-size:.84rem;line-height:1.55;color:var(--text);margin-bottom:16px;}
+    .modal .m-note{font-size:.75rem;color:var(--muted);font-style:italic;margin-bottom:14px;}
+    .modal-actions{display:flex;gap:8px;flex-wrap:wrap;}
+    .modal-close{position:absolute;top:10px;right:13px;background:none;border:none;
+                 font-size:1.3rem;cursor:pointer;color:var(--muted);}
+
+    /* ── Toast ── */
+    #toast{position:fixed;bottom:22px;right:22px;background:var(--dark);color:#fff;
+           padding:11px 18px;border-radius:8px;font-size:.83rem;z-index:2000;
+           opacity:0;transform:translateY(6px);transition:opacity .25s,transform .25s;pointer-events:none;}
+    #toast.show{opacity:1;transform:translateY(0);}
+
+    /* ── Empty state ── */
+    .empty-state{text-align:center;padding:36px 16px;color:var(--muted);}
+    .empty-state .icon{font-size:2.2rem;margin-bottom:10px;}
+
+    /* ── FullCalendar overrides ── */
+    .fc{font-family:inherit;}
+    .fc-event{cursor:pointer;border-radius:4px!important;padding:1px 4px;font-size:.76rem!important;}
+    .fc-event-butlers   {background:var(--green2)!important;border-color:var(--green)!important;}
+    .fc-event-manual    {background:#7b1fa2!important;border-color:#4a148c!important;}
+    .fc-event-tournament{background:var(--gold)!important;border-color:#9a7500!important;}
+    .fc-button-primary{background:var(--green)!important;border-color:var(--green)!important;}
+    .fc-button-primary:hover{background:var(--green2)!important;}
+
+    /* ── Leaflet popup custom ── */
+    .map-popup h4{font-size:.88rem;font-weight:700;margin-bottom:4px;color:var(--dark);}
+    .map-popup p{font-size:.76rem;color:var(--muted);margin-bottom:6px;}
+    .map-popup a{display:inline-block;padding:4px 10px;background:var(--green2);color:#fff;
+                 border-radius:5px;text-decoration:none;font-size:.75rem;font-weight:600;margin-right:4px;}
+
+    /* scrollbar */
+    ::-webkit-scrollbar{width:5px;}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>⛳ Pittsburgh Golf Outings</h1>
+    <p>15239 area — verified events &amp; tee times</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-outline" id="scrapeBtn" onclick="runScrape()">↻ Refresh Events</button>
+    <button class="btn btn-primary" onclick="openTab('add')">+ Add Event</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab-btn active"  onclick="openTab('events')">Events</button>
+      <button class="tab-btn"         onclick="openTab('upcoming')">Upcoming</button>
+      <button class="tab-btn"         onclick="openTab('courses')">Courses</button>
+      <button class="tab-btn"         onclick="openTab('add')">Add</button>
+    </div>
+
+    <!-- Events tab -->
+    <div class="tab-panel active" id="tab-events">
+      <div class="list-search">
+        <input id="evSearch" placeholder="Search events…" oninput="filterEvents()"/>
+      </div>
+      <div class="scroll-list" id="eventList">
+        <div class="empty-state"><div class="icon">⛳</div><p>Loading…</p></div>
+      </div>
+    </div>
+
+    <!-- Upcoming tab -->
+    <div class="tab-panel" id="tab-upcoming">
+      <div class="list-search">
+        <input id="upSearch" placeholder="Search upcoming…" oninput="filterUpcoming()"/>
+      </div>
+      <div class="scroll-list" id="upcomingList">
+        <div class="empty-state"><div class="icon">📅</div><p>Loading…</p></div>
+      </div>
+    </div>
+
+    <!-- Courses tab -->
+    <div class="tab-panel" id="tab-courses">
+      <div class="scroll-list" id="coursesList"></div>
+    </div>
+
+    <!-- Add tab -->
+    <div class="tab-panel" id="tab-add">
+      <div class="add-form">
+        <h3 style="margin-bottom:13px;color:var(--dark);font-size:.93rem;">Add a Golf Outing</h3>
+        <form id="addForm" onsubmit="submitEvent(event)">
+          <div class="form-group">
+            <label>Event Title *</label>
+            <input type="text" name="title" required placeholder="e.g. Annual Charity Scramble"/>
+          </div>
+          <div class="form-group">
+            <label>Course Name *</label>
+            <input type="text" name="course" required placeholder="e.g. 3 Lakes Golf Course" list="courseSuggestions"/>
+            <datalist id="courseSuggestions"></datalist>
+          </div>
+          <div class="form-group">
+            <label>Address</label>
+            <input type="text" name="address" placeholder="123 Golf Rd, Pittsburgh, PA"/>
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" name="date" required/>
+          </div>
+          <div class="form-group">
+            <label>Tee Time / Start</label>
+            <input type="text" name="time" placeholder="8:00 AM Shotgun"/>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select name="type">
+              <option value="outing">Outing / Scramble</option>
+              <option value="tournament">Tournament</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Event / Info URL</label>
+            <input type="url" name="event_url" placeholder="https://…"/>
+          </div>
+          <div class="form-group">
+            <label>Tee Time Booking URL</label>
+            <input type="url" name="tee_time_url" placeholder="https://…"/>
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" placeholder="Details, format, cost…"></textarea>
+          </div>
+          <button type="submit" class="btn btn-secondary" style="width:100%">Save Event</button>
+        </form>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── Main area ── -->
+  <div class="main-area">
+    <div class="view-bar">
+      <button class="btn btn-sm btn-ghost" id="viewCalBtn" onclick="showView('calendar')">📅 Calendar</button>
+      <button class="btn btn-sm btn-ghost" id="viewMapBtn" onclick="showView('map')">🗺 Map</button>
+      <div class="spacer"></div>
+      <button class="btn btn-sm btn-ghost" onclick="calendar.changeView('dayGridMonth')">Month</button>
+      <button class="btn btn-sm btn-ghost" onclick="calendar.changeView('listMonth')">List</button>
+      <button class="btn btn-sm btn-ghost" onclick="calendar.changeView('dayGridWeek')">Week</button>
+      <span class="status" id="viewStatus"></span>
+    </div>
+
+    <div id="calendar-view">
+      <div id="calendar"></div>
+    </div>
+    <div id="map-view">
+      <div id="map"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Modal ── -->
+<div class="modal-backdrop" id="eventModal" onclick="closeModalBg(event)">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h2 id="m-title"></h2>
+    <div class="m-course" id="m-course"></div>
+    <div class="m-date"   id="m-date"></div>
+    <div class="m-desc"   id="m-desc"></div>
+    <div class="m-note"   id="m-note"></div>
+    <div class="modal-actions" id="m-actions"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let allEvents   = [];
+let allUpcoming = [];
+let calendar;
+let leafletMap;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelector('[name="date"]').value = new Date().toISOString().split("T")[0];
+  initCalendar();
+  loadAll();
+});
+
+async function loadAll() {
+  await Promise.all([loadEvents(), loadUpcoming(), loadCourses()]);
+}
+
+// ── Calendar ─────────────────────────────────────────────────────────────────
+function initCalendar() {
+  calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+    initialView: "dayGridMonth",
+    height: "100%",
+    headerToolbar: { left:"prev,next today", center:"title", right:"" },
+    events: [],
+    eventClick(info) {
+      const ev = allEvents.find(e => String(e.id) === info.event.id);
+      if (ev) showModal(ev, false);
+    },
+    eventClassNames(arg) {
+      const src = arg.event.extendedProps.source || "";
+      if (src === "manual") return ["fc-event-manual"];
+      if ((arg.event.extendedProps.type || "") === "tournament") return ["fc-event-tournament"];
+      return ["fc-event-butlers"];
+    },
+  });
+  calendar.render();
+}
+
+// ── Map ───────────────────────────────────────────────────────────────────────
+function initMap(courses) {
+  if (leafletMap) return; // already initialized
+  leafletMap = L.map("map").setView([40.43, -79.80], 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+  }).addTo(leafletMap);
+
+  const greenIcon = L.divIcon({
+    html: `<div style="background:#2d6a4f;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    className: "",
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+
+  courses.forEach(c => {
+    if (!c.lat || !c.lng) return;
+    const popup = `
+      <div class="map-popup">
+        <h4>${esc(c.name)}</h4>
+        <p>${esc(c.address)}</p>
+        ${c.phone ? `<p>${esc(c.phone)}</p>` : ""}
+        <div>
+          ${c.tee_time_url ? `<a href="${esc(c.tee_time_url)}" target="_blank">Book Tee Time</a>` : ""}
+          ${c.website     ? `<a href="${esc(c.website)}"      target="_blank" style="background:#40916c">Website</a>` : ""}
+        </div>
+      </div>`;
+    L.marker([c.lat, c.lng], { icon: greenIcon })
+      .addTo(leafletMap)
+      .bindPopup(popup, { maxWidth: 260 })
+      .bindTooltip(c.name, { permanent: false, direction: "top" });
+  });
+}
+
+// ── View toggle ───────────────────────────────────────────────────────────────
+function showView(v) {
+  const calView = document.getElementById("calendar-view");
+  const mapView = document.getElementById("map-view");
+  const calBtn  = document.getElementById("viewCalBtn");
+  const mapBtn  = document.getElementById("viewMapBtn");
+
+  if (v === "map") {
+    calView.style.display = "none";
+    mapView.style.display = "flex";
+    mapView.style.flex    = "1";
+    calBtn.style.fontWeight  = "400";
+    mapBtn.style.fontWeight  = "700";
+    mapBtn.style.borderColor = "var(--green2)";
+    calBtn.style.borderColor = "var(--border)";
+    // init map after div is visible
+    setTimeout(() => {
+      fetch("/api/courses").then(r=>r.json()).then(courses => {
+        initMap(courses);
+        leafletMap.invalidateSize();
+      });
+    }, 50);
+  } else {
+    calView.style.display = "block";
+    mapView.style.display = "none";
+    calBtn.style.fontWeight  = "700";
+    calBtn.style.borderColor = "var(--green2)";
+    mapBtn.style.fontWeight  = "400";
+    mapBtn.style.borderColor = "var(--border)";
+  }
+}
+
+// ── Load events ───────────────────────────────────────────────────────────────
+async function loadEvents() {
+  try {
+    const res  = await fetch("/api/events");
+    allEvents  = await res.json();
+    renderEventList(allEvents);
+    pushToCalendar(allEvents);
+    document.getElementById("viewStatus").textContent = `${allEvents.length} confirmed events`;
+  } catch(e) { toast("Failed to load events.", true); }
+}
+
+async function loadUpcoming() {
+  try {
+    const res    = await fetch("/api/upcoming");
+    allUpcoming  = await res.json();
+    renderUpcomingList(allUpcoming);
+  } catch(e) { console.error(e); }
+}
+
+async function loadCourses() {
+  try {
+    const res    = await fetch("/api/courses");
+    const courses = await res.json();
+    renderCoursesList(courses);
+    // populate datalist
+    const dl = document.getElementById("courseSuggestions");
+    dl.innerHTML = courses.map(c => `<option value="${esc(c.name)}">`).join("");
+  } catch(e) { console.error(e); }
+}
+
+function pushToCalendar(events) {
+  calendar.removeAllEvents();
+  events.forEach(ev => {
+    calendar.addEvent({
+      id: String(ev.id),
+      title: ev.title,
+      date: ev.date,
+      extendedProps: ev,
+    });
+  });
+}
+
+// ── Render helpers ─────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return "Date TBD";
+  return new Date(iso + "T12:00:00").toLocaleDateString("en-US",
+    { weekday:"short", month:"short", day:"numeric", year:"numeric" });
+}
+
+function renderEventList(events) {
+  const el = document.getElementById("eventList");
+  const sorted = [...events].sort((a,b) => (a.date||"9999").localeCompare(b.date||"9999"));
+  if (!sorted.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">⛳</div><p>No events.<br>Hit <strong>Refresh Butler's</strong> or <strong>Add Event</strong>.</p></div>`;
+    return;
+  }
+  el.innerHTML = sorted.map(ev => `
+    <div class="event-card ${ev.type||''}" onclick='showModal(${JSON.stringify(ev).replace(/'/g,"&#39;")},false)'>
+      <h4>${esc(ev.title)}</h4>
+      <div class="meta">
+        <span>📍 ${esc(ev.course)}</span>
+        <span>📅 ${fmtDate(ev.date)}${ev.time ? " · "+esc(ev.time) : ""}</span>
+      </div>
+      <div class="card-actions">
+        <span class="badge badge-${ev.source==='manual'?'manual':ev.source==='3lakes_calendar'||ev.source==='3lakes_scrape'?'3lakes':'butlers'}">
+          ${ev.source==='manual'?'manual':ev.source==='3lakes_calendar'||ev.source==='3lakes_scrape'?'3 Lakes':'Butler\'s'}
+        </span>
+        ${ev.tee_time_url ? `<a href="${esc(ev.tee_time_url)}" target="_blank" class="btn btn-sm btn-secondary" onclick="event.stopPropagation()">Book Tee Time</a>` : ""}
+      </div>
+    </div>`).join("");
+}
+
+function renderUpcomingList(events) {
+  const el = document.getElementById("upcomingList");
+  const sorted = [...events].sort((a,b) => (a.date||"9999").localeCompare(b.date||"9999"));
+  if (!sorted.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📅</div><p>No upcoming events found.</p></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <p style="font-size:.72rem;color:var(--muted);padding:6px 2px 10px;line-height:1.4;">
+      Community &amp; charity outings sourced from Eventbrite and Pittsburgh Sports League.<br>
+      Register via the event link — tee times are not directly bookable for these.
+    </p>` +
+  sorted.map(ev => `
+    <div class="event-card upcoming-card" onclick='showModal(${JSON.stringify(ev).replace(/'/g,"&#39;")},true)'>
+      <h4>${esc(ev.title)}</h4>
+      <div class="meta">
+        <span>📍 ${esc(ev.course)}</span>
+        <span>📅 ${fmtDate(ev.date)}${ev.time ? " · "+esc(ev.time) : ""}</span>
+      </div>
+      <div class="card-actions">
+        <span class="badge badge-${ev.source==='pgt'?'pgt':'eventbrite'}">${ev.source==='pgt'?'PGT Tour':'Eventbrite'}</span>
+        ${ev.event_url ? `<a href="${esc(ev.event_url)}" target="_blank" class="btn btn-sm btn-blue" onclick="event.stopPropagation()">Register / Info</a>` : ""}
+      </div>
+    </div>`).join("");
+}
+
+function renderCoursesList(courses) {
+  document.getElementById("coursesList").innerHTML = courses.map(c => `
+    <div class="course-card">
+      <h4>${esc(c.name)}</h4>
+      <div class="meta">${esc(c.address)}</div>
+      ${c.phone ? `<div class="meta">${esc(c.phone)}</div>` : ""}
+      <div class="card-actions">
+        ${c.tee_time_url ? `<a href="${esc(c.tee_time_url)}" target="_blank" class="btn btn-sm btn-secondary">Book Tee Time</a>` : ""}
+        ${c.website && c.website !== c.tee_time_url ? `<a href="${esc(c.website)}" target="_blank" class="btn btn-sm btn-ghost">Website</a>` : ""}
+      </div>
+    </div>`).join("");
+}
+
+// ── Filter ─────────────────────────────────────────────────────────────────────
+function filterEvents() {
+  const q = document.getElementById("evSearch").value.toLowerCase();
+  const f = allEvents.filter(e =>
+    !q || (e.title||"").toLowerCase().includes(q) || (e.course||"").toLowerCase().includes(q)
+  );
+  renderEventList(f);
+  pushToCalendar(f);
+}
+
+function filterUpcoming() {
+  const q = document.getElementById("upSearch").value.toLowerCase();
+  renderUpcomingList(allUpcoming.filter(e =>
+    !q || (e.title||"").toLowerCase().includes(q) || (e.course||"").toLowerCase().includes(q)
+  ));
+}
+
+// ── Scrape ─────────────────────────────────────────────────────────────────────
+async function runScrape() {
+  const btn = document.getElementById("scrapeBtn");
+  btn.disabled = true; btn.textContent = "↻ Refreshing…";
+  try {
+    const res = await fetch("/api/scrape", { method:"POST" });
+    const d   = await res.json();
+    if (d.ok) {
+      await loadEvents();
+      toast(`Refreshed — ${d.count} events loaded.`);
+    } else {
+      toast("Scrape failed: " + d.error, true);
+    }
+  } catch(e) { toast("Network error.", true); }
+  finally { btn.disabled = false; btn.textContent = "↻ Refresh Events"; }
+}
+
+// ── Add event ─────────────────────────────────────────────────────────────────
+async function submitEvent(e) {
+  e.preventDefault();
+  const data = {};
+  new FormData(e.target).forEach((v,k) => { data[k] = v; });
+  const res  = await fetch("/api/events", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)
+  });
+  const json = await res.json();
+  if (json.ok) {
+    e.target.reset();
+    e.target.querySelector('[name="date"]').value = new Date().toISOString().split("T")[0];
+    await loadEvents();
+    openTab("events");
+    toast("Event added!");
+  } else { toast("Error: " + json.error, true); }
+}
+
+async function deleteEvent(id) {
+  if (!confirm("Delete this event?")) return;
+  await fetch(`/api/events/${id}`, { method:"DELETE" });
+  closeModal();
+  await loadEvents();
+  toast("Deleted.");
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function showModal(ev, isUpcoming) {
+  document.getElementById("m-title").textContent  = ev.title;
+  document.getElementById("m-course").textContent = ev.course + (ev.address ? " · " + ev.address : "");
+  document.getElementById("m-date").textContent   = fmtDate(ev.date) + (ev.time ? " · " + ev.time : "");
+  document.getElementById("m-desc").textContent   = ev.description || "";
+  document.getElementById("m-note").textContent   = isUpcoming
+    ? "⚠ This event is from a public listing. Tee times for this specific outing are not directly bookable — use the Register/Info link to sign up."
+    : "";
+
+  const act = document.getElementById("m-actions");
+  act.innerHTML = "";
+
+  if (isUpcoming && ev.event_url) {
+    act.innerHTML += `<a href="${esc(ev.event_url)}" target="_blank" class="btn btn-blue">Register / Info</a>`;
+  }
+  if (!isUpcoming && ev.tee_time_url) {
+    act.innerHTML += `<a href="${esc(ev.tee_time_url)}" target="_blank" class="btn btn-secondary">Book Tee Time</a>`;
+  }
+  if (!isUpcoming && ev.event_url) {
+    act.innerHTML += `<a href="${esc(ev.event_url)}" target="_blank" class="btn btn-ghost">Event Details</a>`;
+  }
+  if (ev.source === "manual" && ev.id) {
+    const del = document.createElement("button");
+    del.className = "btn btn-danger"; del.textContent = "Delete";
+    del.onclick = () => deleteEvent(ev.id);
+    act.appendChild(del);
+  }
+
+  document.getElementById("eventModal").classList.add("open");
+}
+function closeModal()            { document.getElementById("eventModal").classList.remove("open"); }
+function closeModalBg(e)         { if (e.target === document.getElementById("eventModal")) closeModal(); }
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function openTab(name) {
+  const names = ["events","upcoming","courses","add"];
+  document.querySelectorAll(".tab-btn").forEach((b,i) => b.classList.toggle("active", names[i]===name));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("tab-"+name).classList.add("active");
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+let _toastTimer;
+function toast(msg, isErr=false) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.style.background = isErr ? "var(--red)" : "var(--dark)";
+  el.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
+}
+</script>
+</body>
+</html>
