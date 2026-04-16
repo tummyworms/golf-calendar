@@ -197,6 +197,7 @@ def load_json(path):
             return []
 
 def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(data, f, indent=2, default=str)
 
@@ -423,7 +424,7 @@ def scrape_route():
             result = build_events_from_seed()
             return jsonify({"ok": True, "count": len(result), "note": "Used cached data"})
         except Exception as e2:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return jsonify({"ok": False, "error": str(e2)}), 500
 
 @app.route("/api/courses")
 def get_courses():
@@ -770,8 +771,7 @@ def seed_data():
     if not os.path.exists(UPCOMING_FILE) or os.path.getsize(UPCOMING_FILE) < 5:
         upcoming = []
         for i, ev in enumerate(UPCOMING_EVENTS, start=1):
-            ev["id"] = i
-            upcoming.append(ev)
+            upcoming.append({**ev, "id": i})
         save_json(UPCOMING_FILE, upcoming)
         print(f"[seed] {len(upcoming)} upcoming events written.")
 
